@@ -58,6 +58,7 @@ class NeuralNetwork(object):
 		# holds the delta values that are needed for other layers
 		# will have the same number elements as outputs
 		deltas = [None] * len(self.outputs)
+		print(deltas)
 		# for loop will break when the i will get to -1
 		# and the for loop will start from len(self.outputs) - 1
 		# its exactly like a reverse for loop in other language where
@@ -88,21 +89,18 @@ class NeuralNetwork(object):
 					weightChanges.append(np.array(weightChange))
 
 			else:
-				# backpropagation formula works differently when you are in the hidden layers
 				# e should be an array containing the errors
 				e = self.eJ(deltas, self.weights, i)
 				
 				delta = self.delta(e, self.fPrime(self.outputs[i]))
-				# assign the delta array to the array of delta arrays in each layer
+				# push the delta array to the array of delta arrays in each layer
 				deltas[i] = (delta)
 
 				for j in range(len(delta)):
 					weightChange = []
 
 					for k in range(len(self.outputs[i - 1])):
-						weightChange.append(delta[j] * self.outputs[i - 1][j])
-
-					weightChanges.append(np.array(weightChange))
+						weightChange.append(delta[j] * self.outputs[i - 1][k])
 
 
 
@@ -146,6 +144,8 @@ def main():
 	print("")
 
 	nn.feedForward([1])
+
+	nn.displayOutputs()
 
 	nn.backPropagation([2, 2]);
 
