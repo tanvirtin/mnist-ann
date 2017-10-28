@@ -1,5 +1,6 @@
 import numpy as np
 import math
+from tqdm import tqdm
 
 class NeuralNetwork(object):
 	# The neural network will take an array as its constructor
@@ -8,8 +9,8 @@ class NeuralNetwork(object):
 	# of the dimensions will be the number of layers the Neural
 	# Network will have.
 
-	def __init__(self, dimensions, activationFunction, activationPrimeFunction):
-		self.learningRate = 0.01
+	def __init__(self, dimensions, epsilon, activationFunction, activationPrimeFunction):
+		self.learningRate = epsilon
 		self.weights = []
 		self.outputs = []
 		# key thing is that number of weights attached to the current layer's each neuron
@@ -27,7 +28,14 @@ class NeuralNetwork(object):
 		# activation function
 		self.f = activationFunction
 		# differentiation of the activation function
-		self.fPrime = activationPrimeFunction 
+		self.fPrime = activationPrimeFunction
+
+		self.bias = []
+		for i in range(len(self.weights)):
+			layer = np.random.rand(len(self.weights[i]))
+			self.bias.append(layer)
+
+		self.bias = np.array(self.bias)
 
 
 	# Feed forward needs an array of inputs which will get multiplied
@@ -48,10 +56,11 @@ class NeuralNetwork(object):
 			# each index will represent each neuron in a network
 			for j in range(len(self.weights[i])):
 				if (i == 0):
-					output.append(self.f(np.dot(self.weights[i][j], inputArray)))
+					# bias weight gets multiplied by 1 so you just directly add the bias
+					output.append(self.f(np.dot(self.weights[i][j], inputArray) + self.bias[i][j])) # we also add the bias weight from each layer, thers 1 bias weight per layer
 				else:
-					output.append(self.f(np.dot(self.weights[i][j], outputs[i - 1])))
-
+					# bias weight gets multiplied by 1 so you just directly add the bias
+					output.append(self.f(np.dot(self.weights[i][j], outputs[i - 1] + self.bias[i][j]))) # we also add the bias weight from each layer, theres 1 bias weight per layer
 			output = np.array(output)
 			outputs.append(output)
 
@@ -99,7 +108,10 @@ class NeuralNetwork(object):
 			else:
 				# backpropagation formula works differently when you are in the hidden layers
 				# e should be an array containing the errors
-				e = self.eJ(deltas, self.weights, i)
+				es = self.eJ(deltas, self.weights, i)
+				e = es[0] # first value of the tuple
+				eBias = es[1] # second value of the tuple
+				
 				delta = self.delta(e, self.fPrime(self.outputs[i]))
 				# assign the delta array theo the array of delta arrays in each layer
 				deltas[i] = (delta)
@@ -135,6 +147,9 @@ class NeuralNetwork(object):
 		# updatating the weights now
 		self.weights = self.weights + (self.learningRate * weightChanges)
 
+	def delta(self, eJ, fPrimeJ):
+		delta = eJ * fPrimeJ
+		return delta
 
 	# finds the e in the output of the neural 
 	def eOutput(self, target, output):
@@ -143,7 +158,12 @@ class NeuralNetwork(object):
 	# to find ej we need the delta's of the layer right next to it and the weights
 	# from the next layer that connect to the current neuron for which the e we find
 	def eJ(self, deltas, weights, layer):
+		# will contain the e number of normal weights in that specific layer
 		e = []
+		# the number o elements in the eBias is the number of bias weights in that specific layer for which
+		# the error calculation is taking plaace
+		eBias = []
+		
 		# this for loop loops over the weights array in a specific layer specified by the layer variable
 		# the elements in the weights array are arrays containing one or many weights, and each element can 
 		# represent the number of neurons in the array
@@ -163,11 +183,25 @@ class NeuralNetwork(object):
 
 			e.append(eJ)
 
-		return e
-		
-	def delta(self, eJ, fPrimeJ):
-		delta = eJ * fPrimeJ
-		return delta
+		# we do the same thing with bias neurons we loop over the layers of the bias neurons
+		# which would be equal to the total number of layers which includes weights in the neural network
+		for i in range(len(self.bias)):
+			# this is the e of the bias neuron
+			ej = 0
+			for j in range(len(deltas[layer + 1])):
+				ej += deltas[layer + 1][j] * self.bias[layer + 1][j]
+
+			eBias.append(eJ)
+
+		# returns a tuple of both normal weights and bias weights
+		return (e, eBias)
+
+	def train(self, inputArray, targetArray):
+		self.feedForward(inputArray)
+		self.backPropagation(targetArray)
+
+	def query(self, inputArray):
+		self.feedForward(inputArray)
 
 	def displayLayers(self):
 		print(self.weights)
@@ -175,15 +209,28 @@ class NeuralNetwork(object):
 	def displayOutputs(self):
 		print(self.outputs)
 
+	def displayFinalOutput(self):
+		print(self.outputs[len(self.outputs) - 1])
+
 def main():
-	nn = NeuralNetwork([1, 3, 2], lambda x: (1 / (1 + math.exp(-x))), lambda x: (x * (1 - x)))
+	nn = NeuralNetwork([2, 3, 3, 1], 0.05, lambda x: (1 / (1 + math.exp(-x))), lambda x: (x * (1 - x)))
 	
-	print("")
+	# lets make a and operator
 
-	nn.feedForward([1])
+	nn.train([0, 0], [0])
 
-	nn.backPropagation([2, 2]);
+	# for i in tqdm(range(10000)):
+	# 	nn.train([0, 0], [0])
+	# 	nn.train([0, 1], [0])
+	# 	nn.train([1, 1], [1])
 
+
+	# nn.query([0, 1])
+	# nn.displayFinalOutput()
+	# nn.query([0, 0])
+	# nn.displayFinalOutput()
+	# nn.query([1, 1])
+	# nn.displayFinalOutput()
 
 if __name__ == "__main__":
 	main()
