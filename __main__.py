@@ -3,6 +3,7 @@ from mnist import MNIST
 from NeuralNetwork import NeuralNetwork
 from tqdm import tqdm
 import scipy.special
+import random
 
 def oneHotEncoding(num):
 	encoded = []
@@ -20,13 +21,36 @@ def processLabels(labels):
 
 	return labels
 
-def main():
-	
-	mndata = MNIST("./data")
+def kFoldsPreperation(images_train, labels_train):
+	dataPerFold = int(len(images_train) / 10)
 
+	imageFolds = []
+
+	labelFolds = []
+
+	iFold = []
+	lFold = []
+	for i in range(len(images_train)):
+		iFold.append(images_train[i])
+		lFold.append(labels_train[i])
+		# if i is a multiple of the datafold then we add the fold to the folds layer
+		# because only a number divisible by 60000 means it is a multiple of 60000
+		# like 60000 * 2, 60000 * 3, etc
+		if i % dataPerFold == 0:
+			# we append the fold to the folds arrays
+			imageFolds.append(iFold)
+			labelFolds.append(lFold)
+			# and we empty out the iFold and lFold array for new dataset to be filled
+			iFold = []
+			lFold = []
+
+	return (imageFolds, labelFolds)
+
+
+def main():
+	mndata = MNIST("./data")
 	# data to train
 	images_train, labels_train = mndata.load_training()	
-
 	# data to test
 	images_test, labels_test = mndata.load_testing()
 
@@ -34,21 +58,55 @@ def main():
 	labels_train = processLabels(list(labels_train))
 	labels_test = processLabels(list(labels_test))
 
-	nn = NeuralNetwork([784, 200, 10], 0.01, lambda x: scipy.special.expit(x), lambda x: x * (1 - x))
+	nn = NeuralNetwork([784, 500, 10], 0.01, 0.001, lambda x: scipy.special.expit(x), lambda x: x * (1 - x))
 
-	epochs = 5
+	imageFolds, labelFolds = kFoldsPreperation(images_train, labels_train)
 
-	for i in range(epochs):
-		print("Epoch number", i + 1)
-		for j in tqdm(range(len(images_train))):
-			nn.train(images_train[j], labels_train[j])
+	# pick a random number, the index that gets tested that round won't be tested again ever
+	# and gets placed in an array of indexes that has already been tested
+	indexesTested = [] # contains the indexes from the folds array for which data has been tested
 
-	for i in range(10):
-		print(nn.query(images_test[i]))
-		print(labels_test[i])
+	# will contain values 0 to imageFolds
+	pool = []
+	for i in range(len(imageFolds)):
+		pool.append(i)
+
+	# we loop till the indexesTested is not equal to 10
+	while len(indexesTested) != len(imageFolds):
+
+		# selects a random number from a pool of 0 to 9 values
+		poolIndex = random.randint(0, len(pool) - 1)
+		randomIndex = pool[poolIndex]
+		# after that specific value is picked from 0 to 9 we delete the value from pool so that it cannot be
+		# selected again
+		del pool[poolIndex]
+
+		print("Training on folds....")
+		for i in range(len(imageFolds)):
+			# if i equals the randomIndex we skip the loop
+			if i == randomIndex:
+				continue
+			for j in tqdm(range(len(imageFolds[i]))):
+				nn.train(imageFolds[i][j], labelFolds[i][j])
 
 
+		# now we test the randomIndex selected from the k folds
+		print("Testing on a random fold....")
+		accuracy = 0
+		for i in tqdm(range(len(imageFolds[randomIndex]))):
+			result = nn.query(imageFolds[randomIndex][i])
+			result = result.tolist()
 
+			if (result.index(max(result)) == labelFolds[randomIndex][i].index(max(labelFolds[randomIndex][i]))):
+				accuracy += 1
+
+		# at the end of the for loop we find the accuracy in percentage
+
+		percentageAccuracy = (accuracy / len(imageFolds[randomIndex])) / 100
+
+		print("Accuracy of Neural Network at the moment... {}%".format(percentageAccuracy))
+
+		indexesTested.append(randomIndex)
 
 if __name__ == "__main__":
 	main()

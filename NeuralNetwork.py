@@ -7,7 +7,7 @@ import scipy.special
 class NeuralNetwork:
 
 	# initialise the neural network
-	def __init__(self, dimensions, learningRate, activationFunction, activationFunctionPrime):
+	def __init__(self, dimensions, learningRate, weightDecay, activationFunction, activationFunctionPrime):
 		# # this array will contain all the layers of the neural network
 		self.layers = []
 
@@ -19,7 +19,9 @@ class NeuralNetwork:
 			for j in range(dimensions[i]):
 				# number of weights per neuron is equal to the number of nodes
 				# in the previous layer
-				hiddenLayer.append(numpy.random.rand(dimensions[i - 1]))
+				# very important for the weights to be assigned with random values from -1 to +1
+				# as our algorithm adds up the change in weight
+				hiddenLayer.append(numpy.random.uniform(-1, 1, dimensions[i - 1]))
 
 			# make the hiddenLayer into a numpy array
 			hiddenLayer = numpy.array(hiddenLayer)
@@ -27,7 +29,10 @@ class NeuralNetwork:
 			self.layers.append(hiddenLayer)
 
 		# learning rate
-		self.epsilon = learningRate
+		self.learningRate = learningRate
+
+		# weight decay rate
+		self.weightDecay = weightDecay
 		
 		# activation function
 		self.f = activationFunction
@@ -48,7 +53,7 @@ class NeuralNetwork:
 		# the array of  errors of each neuron in each layer
 		hiddenErrors = [None] * (len(outputs) - 1)
 
-		# we loop backwards excluding the last layer
+		# we loop backwards excluding the last layer as the hiddenlayer has a size of number of weight layers - 1
 		for i in reversed(range(len(outputs) - 1)):
 			hiddenError = 0
 			if i == len(outputs) - 2:
@@ -58,16 +63,14 @@ class NeuralNetwork:
 
 			hiddenErrors[i] = hiddenError
 
-
-		# update the weights
-
+		# update the weights using weight decay
 		for i in reversed(range(len(self.layers))):
 			if i == len(self.layers) - 1:
-				self.layers[i] += self.epsilon * numpy.dot((outputsError * self.fPrime(outputs[i])), numpy.transpose(outputs[i - 1])) 
+				self.layers[i] += (self.learningRate * numpy.dot((outputsError * self.fPrime(outputs[i])), numpy.transpose(outputs[i - 1]))) + (self.learningRate * self.weightDecay * self.layers[i])
 			elif i == 0:
-				self.layers[i] += self.epsilon * numpy.dot((hiddenErrors[i] * self.fPrime(outputs[i])), numpy.transpose(inputs))
+				self.layers[i] += (self.learningRate * numpy.dot((hiddenErrors[i] * self.fPrime(outputs[i])), numpy.transpose(inputs))) + (self.learningRate * self.weightDecay * self.layers[i])
 			else:
-				self.layers[i] += self.epsilon * numpy.dot((hiddenErrors[i] * self.fPrime(outputs[i])), numpy.transpose(outputs[i - 1]))
+				self.layers[i] += (self.learningRate * numpy.dot((hiddenErrors[i] * self.fPrime(outputs[i])), numpy.transpose(outputs[i - 1]))) + (self.learningRate * self.weightDecay * self.layers[i])
 
 	def train(self, inputs, targets):
 		self.backPropagation(inputs, targets)
@@ -101,24 +104,17 @@ class NeuralNetwork:
 
 
 def main():
-	# number of input, hidden and output nodes
-	input_nodes = 2
-	hidden_nodes = 2
-	output_nodes = 1
+	nn = NeuralNetwork([2, 2, 1], 0.01, 0.001, lambda x: scipy.special.expit(x), lambda x: x * (1 - x))
 
-	# learning rate
-	learning_rate = 0.01
-
-	nn = NeuralNetwork([2, 2, 1], 0.01, lambda x: scipy.special.expit(x), lambda x: x * (1 - x))
-
-	for i in tqdm(range(10000)):
+	for i in tqdm(range(1000000)):
 		nn.train([0, 0], [0])
 		nn.train([0, 1], [0])
 		nn.train([1, 1], [1])
 
 	print(nn.query([0, 1]))
 	print(nn.query([1, 1]))
-	print(nn.query([0, 1]))
+	print(nn.query([1, 0]))
+	print(nn.query([0, 0]))
 
 
 	
